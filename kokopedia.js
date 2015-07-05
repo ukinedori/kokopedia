@@ -1,4 +1,4 @@
-﻿// This Source Code Form is subject to the terms of the Mozilla Public
+// This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
@@ -11,7 +11,8 @@ var maxInf = 15;
 var numlist = ['[1]','[2]','[3]','[4]','[5]','[6]','[7]','[8]','[9]','[10]',
                '[11]','[12]','[13]','[14]','[15]'];
 
-var dbpedia_err = '<br/>DBpediaとの通信に失敗しました。';
+var overpass_err = '<br/>Overpass APIとの通信に失敗しました。';
+
 var footer_dbpedia = 'DBpedia Japanese by ' +
       '<a href="http://ja.dbpedia.org/" target="_blank">DBpedia Community</a> ' +
       'is licensed under a ' +
@@ -20,8 +21,7 @@ var footer_dbpedia = 'DBpedia Japanese by ' +
 var no_inf = '<br/>この地図の範囲の情報はありません。';
 var origin = [139.741357, 35.658099]; // 日本経緯度原点
 var server = 'http://ja.dbpedia.org/sparql';
-var lang_filter = 'FILTER (LANG(?name)=\'ja\' && LANG(?abstract)=\'ja\')';
-var req;
+var overpass = 'http://overpass-api.de/api/interpreter?data=';
 
 $(function(){
 
@@ -85,55 +85,54 @@ $(function(){
 
 function showContent() {
 
-  if(req) {
-    req.abort();
-  }
   var zoom = view.getZoom();
   var rect = getRect();
-  var sparql = 
-    'SELECT distinct ?name, ?abstract, ?lat, ?lon, ?url, ?link ' + 
-    'WHERE { ' +
-    '?s rdfs:label ?name ; ' +
-    'dbpedia-owl:abstract ?abstract ; ' +
-    'foaf:isPrimaryTopicOf ?url ; ' +
-    'geo:lat ?lat ; ' +
-    'geo:long ?lon . ' +
-    'OPTIONAL { ?s foaf:homepage ?link } ' +
-    'FILTER ( ?lon > "' + rect[0] + '"^^xsd:float && ?lon < "' + rect[2] + '"^^xsd:float && ' +
-    '?lat > "' + rect[1] + '"^^xsd:float && ?lat < "' + rect[3] + '"^^xsd:float ) ' +
-    lang_filter +
-    '} ' +
-    'LIMIT ' + maxInf;
-  var query = {
-    query : sparql,
-    format: 'application/sparql-results+json'
-  };
 
-  req = $.getJSON(server, query, function(data){
+  var query = 
+    '<osm-script output="json">' +
+        '<query type="node">' +
+        '<has-kv k="wikipedia" regv="^ja:"/>' +
+        '<bbox-query e="' + rect[2] + '" ' +
+                    'n="' + rect[3] + '" ' +
+                    's="' + rect[1] + '" ' +
+                    'w="' + rect[0] + '"/>' +
+        '</query>' +
+      '<print limit="' + maxInf + '" />' +
+    '</osm-script>';
 
-    req = null;
+
+  $.getJSON(overpass + encodeURI(query), function(data){
+
+    var list = data.elements;
+    var name;
+    var tags, lon, lat, idx=0;
+
     vectorSource.clear();
-    var list = data.results.bindings;
+    bodydiv.innerHTML = '';
 
-    bodydiv.innerHTML = '';             // clear
-    for(i=0 ; i<list.length ; i++) {
-      var topic = '<strong>' + numlist[i] + ' ' + 
-        '<a href="' + list[i].url.value + '" target="_blank">' +
-        list[i].name.value + '</a></strong><p></p>';
-      bodydiv.innerHTML += topic;
+    for(i=0 ; i<list.length && idx<maxInf ; i++) {
 
-      bodydiv.innerHTML += '<p>' + list[i].abstract.value + '</p>';
-
-      if(list[i].link) {
-        bodydiv.innerHTML += '<p>' +
-          '<a href="' + list[i].link.value + '" target="_blank">' + 
-        list[i].link.value + '</a></p>';
+      tags = list[i].tags;
+      if(!tags || !tags.name) {
+        // tags、nameのないobjectは無視
+        continue;
       }
+
+      lon = list[i].lon;
+      lat = list[i].lat;
+      name = '<strong>' + numlist[idx] + ' ' + 
+             '<a href = "http://ja.wikipedia.org/wiki/' + 
+             tags.wikipedia.substr(3) + '">' +
+             tags['name'] + '</a></strong><br/>';
+      bodydiv.innerHTML += name + '<p>';
+      var pid = 'abstract_' + i;
+      bodydiv.innerHTML += '<p id="' + pid + '"></p>';
+      showAbstract(pid, tags.wikipedia.substr(3));
 
       var iconFeature = new ol.Feature({
       geometry: new ol.geom.Point(
         ol.proj.transform(
-          [parseFloat(list[i].lon.value), parseFloat(list[i].lat.value)],
+          [parseFloat(lon), parseFloat(lat)],
           'EPSG:4326', 'EPSG:3857'))
       });
 
@@ -146,7 +145,7 @@ function showContent() {
             color: '#00F',
             opacity: 0.5,
             width: 5}),
-          text: i+1,
+          text: idx + 1,
           opacity: 0.5,
           font: '20px Verdana'
         }),
@@ -155,23 +154,53 @@ function showContent() {
 
       iconFeature.setStyle(iconStyle);
       vectorSource.addFeature(iconFeature);
+      idx++;
 
     }
-    if(list.length > 0) {
-      bodydiv.innerHTML += '<hr/>' + footer_dbpedia;
+
+    if(idx > 0) {
+      var footer = '<hr>Data &copy; ' +
+      '<a href="http://www.openstreetmap.org/">OpenStreetMap</a> ' +
+      'contributors, ' +
+      '<a href="http://www.openstreetmap.org/copyright">ODbL</a>' +
+      '<br/>';
+      bodydiv.innerHTML += footer;
+      bodydiv.innerHTML += footer_dbpedia;
     } else {
       bodydiv.innerHTML = no_inf;
     }
-
   })
-  .error(function() {
-    req = null;
+  .error(function(err) {
     vectorSource.clear();
-    bodydiv.innerHTML = dbpedia_err;
+    bodydiv.innerHTML = overpass_err;
   });
 
   $('#contentdiv').scrollTop(0);
 
+}
+
+function showAbstract(pid, topic) {
+
+  var ret = '';
+  var sparql = 
+    'SELECT ?abstract ' + 
+    'WHERE { ' +
+    '<http://ja.dbpedia.org/resource/' + topic + '>' +
+    ' dbpedia-owl:abstract ?abstract . ' +
+    '} ' +
+    'LIMIT 1';
+
+  var query = {
+    query : sparql,
+    format: 'application/sparql-results+json'
+  };
+
+  $.getJSON(server, query, function(data){
+    var list = data.results.bindings;
+    if(list.length > 0) {
+      $('#' + pid).text(list[0].abstract.value);
+    }
+  });
 }
 
 function getRect() {
