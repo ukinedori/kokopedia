@@ -22,6 +22,7 @@ var no_inf = '<br/>この地図の範囲の情報はありません。';
 var origin = [139.741357, 35.658099]; // 日本経緯度原点
 var server = 'http://ja.dbpedia.org/sparql';
 var overpass = 'http://overpass-api.de/api/interpreter?data=';
+var req;
 
 $(function(){
 
@@ -85,6 +86,9 @@ $(function(){
 
 function showContent() {
 
+  if(req) {
+    req.abort();
+  }
   var zoom = view.getZoom();
   var rect = getRect();
 
@@ -101,8 +105,9 @@ function showContent() {
     '</osm-script>';
 
 
-  $.getJSON(overpass + encodeURI(query), function(data){
+  req = $.getJSON(overpass + encodeURI(query), function(data){
 
+    req = null;
     var list = data.elements;
     var name;
     var tags, lon, lat, idx=0;
@@ -171,6 +176,7 @@ function showContent() {
     }
   })
   .error(function(err) {
+    req = null;
     vectorSource.clear();
     bodydiv.innerHTML = overpass_err;
   });
