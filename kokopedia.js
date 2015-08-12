@@ -36,9 +36,8 @@ $(function(){
   map = new ol.Map({
     target: 'map',
     view: view,
-    controls: new ol.control.defaults({rotate:false, attribution:false}).extend([
-      new ol.control.ScaleLine(),
-      new ol.control.Attribution({collapsible:false})
+    controls: new ol.control.defaults({rotate:false, attributionOptions:({collapsible: false})).extend([
+      new ol.control.ScaleLine()
     ]),
     interactions: ol.interaction.defaults({pinchRotate:false})
   });
@@ -48,9 +47,7 @@ $(function(){
         new ol.Attribution({
           html: 'Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">'
         }),
-        new ol.Attribution({
-          html: 'Map data &copy; <a href="http://openstreetmap.org" target="_blank">OpenStreetMap</a> contributors, <a href="http://www.opendatacommons.org/licenses/odbl" target="_blank">ODbL</a>'
-        })
+        ol.source.OSM.ATTRIBUTION
       ],
       url: 'http://otile{1-4}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.jpg'
     })
