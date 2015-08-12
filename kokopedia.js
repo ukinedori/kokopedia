@@ -47,7 +47,9 @@ $(function(){
         new ol.Attribution({
           html: 'Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">'
         }),
-        ol.source.OSM.ATTRIBUTION
+        new ol.Attribution({
+          html: 'Map data &copy; <a href="http://openstreetmap.org" target="_blank">OpenStreetMap</a> contributors, <a href="http://www.opendatacommons.org/licenses/odbl" target="_blank">ODbL</a>'
+        })
       ],
       url: 'http://otile{1-4}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.jpg'
     })
